@@ -1,40 +1,67 @@
 <?php 
-	// Returns an array with either:
-	// if api version 1: [string secret, string code]
-	// if api version 2: [bool already_exists, string secret, string code]
-	function allocate($code = false, $ApiVersion = 1) {
-		global $db;
+/**
+ * Allocates a short link and secret token.
+ * 
+ * @param string|false $code Optional custom code. If false, a new code is generated.
+ * @param int $ApiVersion API version: 
+ *        - 1 returns [secret, code]
+ *        - 2 returns [already_exists, secret, code]
+ * @return array
+ */
+function allocate($code = false, $ApiVersion = 1) {
+    global $db;
 
-		if (strlen($code) > 250) {
-			header('HTTP/1.1 400 Bad Request');
-			die('Requested short link is too long (the maximum is 250 characters)');
-		}
+    // Validate code length
+    if (!empty($code) && strlen($code) > 250) {
+        http_response_code(400);
+        die('Requested short link is too long (maximum is 250 characters)');
+    }
 
-		$secret = substr(hash('sha256', openssl_random_pseudo_bytes(20)), 0, 40);
-		if (empty($code)) {
-			$code = getNewCode($secret);
-		}
-		else {
-			$exists = codeExists($code);
-			if ($exists === 'semi') {
-				clearUrl(getSecretByCode($code));
-				$db->query('DELETE FROM shorts WHERE `key` = "' . $db->escape_string($code) . '"') or die('Database error 95184');
-			}
-			if ($exists === true) {
-				return [true, $code];
-			}
-			else {
-				// TODO why did this error trigger when pasting a custom link
-				$db->query("INSERT INTO shorts (`key`, `type`, `value`, `expires`, `secret`) VALUES('" . $db->escape_string($code) . "', -1, '', " . (time() + 900) . ", '" . $secret . "')") or die('Database error 81935: ' . $db->error);
-			}
-		}
+    // Generate a secure secret token
+    $secret = substr(hash('sha256', openssl_random_pseudo_bytes(20)), 0, 40);
 
-		if ($ApiVersion == 2) {
-			return [false, $secret, $code];
-		}
+    // If no custom code provided, generate one
+    if (empty($code)) {
+        $code = getNewCode($secret);
+    } else {
+        $exists = codeExists($code);
 
-		return [$secret, $code];
-	}
+        if ($exists === 'semi') {
+            // Clean up semi-expired code
+            $existingSecret = getSecretByCode($code);
+            clearUrl($existingSecret);
+            $db->query('DELETE FROM shorts WHERE `key` = "' . $db->escape_string($code) . '"')
+                or die('Database error 95184');
+        }
+
+        if ($exists === true) {
+            // Code already exists, return early for API v2
+            if ($ApiVersion == 2) {
+                return [true, '', $code];
+            }
+            return ['', $code]; // For API v1, secret is irrelevant here
+        }
+
+        // Insert new custom code
+        $escapedCode = $db->escape_string($code);
+        $escapedSecret = $db->escape_string($secret);
+        $expires = time() + 900; // 15 minutes
+
+        $insertQuery = "
+            INSERT INTO shorts (`key`, `type`, `value`, `expires`, `secret`)
+            VALUES ('$escapedCode', -1, '', $expires, '$escapedSecret')
+        ";
+
+        $db->query($insertQuery) or die('Database error 81935: ' . $db->error);
+    }
+
+    // Return based on API version
+    if ($ApiVersion == 2) {
+        return [false, $secret, $code];
+    }
+
+    return [$secret, $code];
+}
 
 	// Returns true for taken; false for not taken; "semi" for taken but expired (will evaluate to true for unaware functions)
 	function codeExists($code) {
