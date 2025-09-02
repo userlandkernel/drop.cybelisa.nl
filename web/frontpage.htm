@@ -33,7 +33,6 @@ See https://dro.pm/shell.txt for more information.
 			</div>
 			<span id="sendToDevice" style="display: none; margin-bottom: 20px; font-size: 14pt;">
 				<br>
-				<span id=chooseyourlink>1. Choose your link</span><br>
 				<input maxlength=250 id=customLink autocapitalize=off> <span id=customLinkValidation></span>
 				<!-- TODO shuffle button using cryptographic random -->
 				<br><br>
@@ -420,7 +419,7 @@ See https://dro.pm/shell.txt for more information.
 			}
 
 			function setUrl(shortcode, dontClearOldUrls) {
-				url = (location.hostname.indexOf('beta.') != -1 ? 'beta.' : '') + "dro.pm/" + shortcode;
+				url = (location.hostname.indexOf('beta.') != -1 ? 'beta.' : '') + "drop.cyberlisa.nl/" + shortcode;
 				if (urlShown) {
 					showUrl(url);
 				}
@@ -503,7 +502,7 @@ See https://dro.pm/shell.txt for more information.
 
 					t = 400;
 					function checkForUpdate() {
-						aGET('api/v1/check/' + url.replace((location.hostname.indexOf('beta.') != -1 ? 'beta.' : '') + 'dro.pm/', ''), function(data) {
+						aGET('api/v1/check/' + url.replace((location.hostname.indexOf('beta.') != -1 ? 'beta.' : '') + 'drop.cyberlisa.nl/', ''), function(data) {
 							if (data == '1') {
 								var text = "";
 								if (customUrl === false) {
